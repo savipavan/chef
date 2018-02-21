@@ -1,0 +1,165 @@
+2.5 Working with not_if and only_if guards
+------------------------------------------
+add the code to existing ruby file
+
+file '/etc/motd' do
+  content 'welcome to my server'
+end
+:wq
+
+#run chef locally
+
+#update if file exists
+vi learn.rb
+execute 'command-test' do
+  command 'echo blah >> /etc/motd'
+  only_if 'test -r /etc/motd'
+end
+
+#run chef locally
+
+
+#run if file doesn't exists
+vi learn.rb
+execute 'command-test' do
+  command 'echo blah >> /etc/motd'
+  not_if 'test -r /etc/motd'
+end
+
+#run chef locally
+
+#update if file exists
+vi learn.rb
+execute 'command-test' do
+  command 'echo blah >> /etc/motd'
+  only_if { ::File.exists?('/etc/motd'0 }
+end
+
+#run locally
+chef-client -z learn.rb
+
+2.6 Extending Chef with Custom Resources:
+-----------------------------------------
+Chef Extensibility:
+
+Understanding Chef Extensibility: Custom Resources
+ - Chef is designed to be extended and grow with the complexity and requirements of any environment.
+ - Chef is also designed in a way that custom resources can be used to reduce repetative coding and manual errors that are accompanied with such coding.
+Note : Custom resource exaples will be covered in later lessons
+
+Understanding Chef Extensibility: Custom Resources:
+ - Very Simply, a custom resource:
+  -- Is a simple extension of Chef
+  -- Is implemented as part of a cookbook (in the /resources directory)
+ -- Follows easy, repeatable syntax patterns
+ -- Effectively leverages resources that are build into Chef
+ -- Is reusable in the same way as resources that are built into Chef
+  -- Can be used to take complex resource declartions and reduce the properties required for configuration that allows less experienced admins to be able to use those custom resources rather than more complex resource policies
+  
+  Understanding Chef Extensibility: Libraries
+
+Libraries in Chef are used to create reusable sets of code that can be placed or used within a recipe in a clean way.
+
+Example:
+ execute 'not-if-example' do
+   command '/usr/bin/echo "10.0.2.1 webserver01">>/etc/hosts'
+   not_if 'test -z $(grep "10.0.2.1 webserver01">>/etc/hosts)'
+ end
+ 
+ Take the "test -z$(grep "10.0.2.1 webserver01" /etc/hosts)" and add it to a library as a Ruby Function
+(We will avoid the library code at the moment until knowledge on writing libraries is requied)
+The execute resource type then looks liked this:
+
+execute 'not-if-example' do
+  command '/usr/bin/echo "10.0.2.1 webserver01">>/etc/hosts'
+  not_if{has_host_entry?}
+end
+
+3.1 Chef Recipes
+----------------
+Recipes: We've been writing our resource blocks within a recipe.
+
+Recipes are written using Ruby. There is no "custom" language to use Chef. Not a bunch of Ruby knowledge is required, just the basics, of which we will learn in the course.
+
+Recipes are a collection of resources, defined and written using patterns. Helper code, such as loops and if statements, cab be written around those resources to help customize the configurations of specific nodes. For example, if or case statements around package names.
+
+Chef defines a recipe as the most fundamental configuration element within the organization.
+A recipe:
+ - Is created using Ruby
+ - Is a collection of resources defined using patterns; helper code is added using Ruby
+ - Must define everything that is required to configure part of a system
+ - Must be stored in a cookbook
+ - May be included in a recipe(include_recipe)
+ - May use the results of a search query and read the contents of a data bag
+May have a dependency on one(or more) recipes
+ - May tag a node to facilitate the creation of arbitrary groupings
+- Must be added to a run-list before it can be used by the chef-client
+ - is always executed in the same order as listed in a run-list
+- if included multiple times in a run-list, will only be executed once.
+
+Chef Resource Ordering Execution:
+
+Resources are executed in the order that they are listed/created within a recipe, starting with the first recipe in a run-list
+There are "directives" that can change the order in which resources are executed
+ - notifies: A notification property that allows a resource to notify another resource to take action when its state changes.
+ - subscribes: A notification property that allows a resource to listen to another resource and then take action if the state of the resource being listened to changes.
+ 
+ Chef resource ordering exection
+ --------------------------------
+
+First Example
+-------------
+service 'httpd' do
+ end
+
+cookbook_file"/etc/httpd/conf/httpd.conf" do
+  owner 'root'
+  group 'root'
+  mode '0644'
+  source 'httpd.conf'
+  notifies :restart, "service[httpd]"
+end
+
+Second Example
+--------------
+service 'httpd' do
+  subscribes :reload, "cookbook_file[/etc/httpd/conf/httpd.conf]"
+end
+
+cookbook_file"/etc/httpd/conf/httpd.conf" do
+  owner 'root'
+  group 'root'
+  mode '0644'
+  source 'httpd.conf'
+end
+
+Third Example
+------------
+service 'httpd' do
+  action [:enable,:start]
+end
+
+cookbook_file"/etc/httpd/conf/httpd.conf" do
+  owner 'root'
+  group 'root'
+  mode '0644'
+  source 'httpd.conf'
+  notifies :restart, "service[httpd]"
+end
+
+A Brief Look at run_list
+------------------------
+A run-list is a list of cookbooks/recipes that are to be executed on the given node.
+
+Example:
+run_list "recipe[base]","recipe[apache]","recipe[selinux_policy]"
+
+chef-client will execute the base recipe followed by apache, selinux_policy.
+run_list "recipe[base::recipe]","recipe[apache::recipe]","recipe[selinux_policy::recipe]","recipe[base::recipe]"
+
+Note : If for any reason a recipe is assigned to a node more than once (via roles/environments/etc.) chef-client will only execute it one time
+
+78-666-2 - Understanding Chef Cookbooks
+--------------------------------------
+
+
