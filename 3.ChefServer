@@ -1,0 +1,11 @@
+Chef Server:
+The Chef Server is the central locatin which acts as an artifact repository or "hub" that stores cookbooks, cookbook versions, facts about the node, data bags and metadata information about nodes.
+
+All metadata of a node, when it is registered with chef server, is stored on the Chef server.
+
+The metadata is populated and sent to the server with chef-client, which is an application that runs on the node. (Covered in later lessons.)
+
+Configuration enforcement is not handled by the Chef Server, instead, the desired state configuration is enforced when a chef-client runs and a "convergencce" happens, allowing for easy scalability.
+
+Installing Chef Enterprise Server:
+-----------------------------------
