@@ -9,3 +9,30 @@ Configuration enforcement is not handled by the Chef Server, instead, the desire
 
 Installing Chef Enterprise Server:
 -----------------------------------
+# Chef Server is giving 25 free node license for enterprise
+
+connect to the centos7
+
+wget https://downloads.chef.io/terms-of-use-agreement?product=chef-server&download=https%3A%26%23x2F%3B%26%23x2F%3Bpackages.chef.io%26%23x2F%3Bfiles%26%23x2F%3Bstable%26%23x2F%3Bchef-server%26%23x2F%3B12.17.15%26%23x2F%3Bel%26%23x2F%3B7%26%23x2F%3Bchef-server-core-12.17.15-1.el7.x86_64.rpm
+
+rpm -Uvh chef-server-core-12.17.15-1.el7.x86_64.rpm
+
+#dpkg -i chef-server-core-12.17.15-1.el7.x86_64.rpm # for centos
+
+#chef-server-ctl reconfigure
+
+#chef0server-ctl user-create pavan pavan kumar savipavan@gmail.com 'Sunday@123' --filename pavan-rsa
+
+create a organization:
+
+#chef-server-ctl org-create pavan_org 'Pavan Org, Inc' --association_user pavan --filename pavanOrg-validator.pem
+
+GUI interface - Rails manage
+#chef-server-ctl install chef-manage
+
+reconfigure chef manage
+#chef-manage-ctl reconfigure
+
+Open browser and open IPAddress/login --> proceed --> enter username and password
+
+78-668-3 - Chef-Repo, Setting Up the Work Station, and Bootstrapping A Node
