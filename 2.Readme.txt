@@ -161,5 +161,188 @@ Note : If for any reason a recipe is assigned to a node more than once (via role
 
 78-666-2 - Understanding Chef Cookbooks
 --------------------------------------
+Cookbooks: A cookbook is the fundamental unit of configuration and policy distribution when using chef.
+Cookbooks contain the following information:
+ - Recipes
+ - Attribute files
+ - File distributions
+ - Templates
+ - Any extensions to Chef such as libraries and custom resources
+
+A Chef cookbook defines a scenario. For example, our Apache cookbook. The cookbook defines everything needed to install and configure Apache.
+
+Modules and additional Apache configurations required for our application can be broken out into individual recipes within the cookbook.
+
+Cookbooks: README.md
+--------------------
+The cookbook readme file, located inside of cookbooks/cookbookname/README.md is a description of the cookbook's features that is written using Markdown.
+
+Markdown is text-to-HTML conversion tool for makring it easy to write structurally valid HTML.
+
+Cookbooks: metadata.rb
+---------------------
+Cookbook metadata is located in cookbooks/cookbookname/metadata.rb. Each cookbook requires certain metadata information.
+
+Common Metadata Settings for Chef Fluency Badge
+- Chef_version: Allows you to specify which version of Chef the cookbook requires to operate correctly
+- Depends: Allows you to specify if there are another cookbook dependencies including the same cookbook but a different version(think back to include_receipe)
+- version: Specifies the version of the cookbook. Chef Server stores the versions differently, allowing for version control of cookbooks within the chef server.
+
+Cookbooks: metadata.rb
+----------------------
+name 'mycookbook'
+maintainer 'The Authors'
+maintainer_email 'you@example.com'
+license 'all_rights'
+description 'Installs/Configures mycookbook'
+long_description 'Installs/Configures mycookbook'
+version '0.1.0'
+depends 'mysql', '>=10'
+
+Cookbooks: Default cookbook recipe:
+-----------------------------------
+The default cookbook recipe is default.rb which is created with the cookbook. The main part of the configuration for the cookbook generally live here. For example, installing packages and starting services for the cookbook scenario(i.e Apache/MariaDB)
+
+What does the default cookbook mean?
+
+If you were to include a cookbook without a recipe in a run list, then by default it would run cookbookname::default the default recipe.
+
+Cookbooks: Default Cookbook Recipe
+----------------------------------
+run_list "recipe[apache]"
+
+This is the same as: run_list "recipe[apache::default]"
+
+Use the apache cookbook and add the default recipe to the node's run-list. All other recipes in the cookbook, unless include_recipe is used, are ignored.
+
+3.3 Generating a Cookbook
+-------------------------
+chef --help
+# chef generate cookbook /root/workstation
+# ls
+# cd workstation
+# cp /root/learn.rb /root/workstation/recipes
+# ls
+# vim default.rb
+  package 'tree' do
+  end
+
+chef-client --local-mode recipes/default.rb
+
+# tree
+
+3.4 Cookbook Pro-Tips
+---------------------
+Pro-Tip 1: Be familiar with the ChefDK generators
+Available Generators:
+- chef generate app                 #Generate the application repo
+- chef generate cookbook            #Generate a single cookbook
+- chef generate recipe	            #Generate a new recipe
+- chef generate attribute		#Generate a attributes file
+- chef generate template		#Generate a file template
+- chef generate file 			#Generate a cookbook file.
+- chef generate lwrp			#Generate a lightweight recourse/provider
+- chef generate repo			#Generate a Chef code repository
+- chef generate policyfile		#Genearate a PolicyFile for use with install/push commands
+- chef generate generator		#Copy ChefDK's generator cookbook to customize
+- chef generate build-cookbook		#Genearate a build cookbook for delivery command
+
+Directory structure of running: chef generate app my_app
+--------------------------------------------------------
+This is what a well-organized application repository looks like:
+ - A README.md in the root directory
+ - A test directory with a compliance profile in test/smoke/default/default_test.rb
+- A cookbooks directory for multiple cookbooks
+  - A cookbook called "my_app"
+  - The cookbook contains:
+    - Berksfile
+    - chefignore
+    - metadata.rb
+    - A default recipe in recipes/default.rb
+    - A starter unit test in spec/unit/recipes/default_spec.rb
+ 
+ Unit tests run with the ChefSpec unit testing framework
+ 
+ 
+ Directory structure of running: chef generate cookbook a_cookbook
+-----------------------------------------------------------------
+This is what a well-organized standalone cookbook looks lie:
+ - Berksfile
+ - chefignore
+ - metadata.rb
+ - README.md
+ - A default recipe in recipes/default.rb
+ - A starter unit test in spec/unit/recipes/default_spec.rb
+ - A test directory with a compliance profile in test/smoke/default/default_test.rb
+
+The primary difference is that the "test" diectory is now included in your cookbook directly
+
+Pro-Tip 2: Upload environments from a file
+------------------------------------------
+environments/environment.json:
+ {
+	"name":"example",
+	"description":"This is an example environment defined as JSON",
+	"chef_type":"environment",
+	"json_class":"Chef::Environment",
+	"default_attributes":{ },
+	"override_attributes":{ },
+	"cookbook_versions":{
+	  "example":"=1.0.0"
+	}
+      }
+
+Deploy to Chef Server with knife environment from file environment.json
+
+Pro-Tip 2: Upload roles from a file
+------------------------------------------
+roles/example.json:
+ {
+	"name":"example",
+	"description":"This is an example role defined as JSON",
+	"chef_type":"role",
+	"json_class":"Chef::Role",
+	"default_attributes":{ },
+	"override_attributes":{ },
+	"run_list":[
+	  "recipe[example]"
+	]
+      }
+
+Deploy to Chef Server with knife role from file example.json
+
+Pro-Tip 4: Manage your dependencies:
+------------------------------------
+One way to manage your dependencies is to "vendor" the dependency into your repository:
+ - knife cookbook site install httpd #Copy the httpd cookbook from the Supermarker
+ - knife cookbook upload httpd   #upload the dependency into Chef Server
+
+- We can only upload one cookbook at a time with knife cookbook upload
+
+Another way to manage your dependencies is with Berkshelf
+---------------------------------------------------------
+- Berkshelf is included with the ChefDK with the berks command.
+- You can specify a public or private Supermarket within your Berksfile and declare cookbooks that you depend on
+	- berks install 	#Fetch dependencies from the Supermarket
+	- berks upload		#Upload all dependencies and sub-dependencies to Chef Serve
+
+	--Supply the SSL_CERT_FILE environment variable or pass in the --no-ssl-verify flag to configure berks to communicate with Chef Server
+  
+Pro-Tip 5: Use Wrapper cookbooks
+---------------------------------
+Wrapper cookbooks allow you to modify the behavior of upstream cookbooks without forking or vendoring them
+
+To create a wrapper cookbook:
+	- Generate a wrapper cookbook (e.g.: chef generate cookbook mycompany-ntp)
+	- Add the dependency (i.e.: Add depends 'ntp' to your metadata.rb or add cookbook 'ntp' to your Berksfile)
+	- Override attributes:
+		-- mycompany-ntp/attributes/default.rb:
+			--default ['ntp']['peers']=['ntp1.mycompany.com','ntp2.mycompany.com']
+	- include the original cookbook in your recipe:
+		-- my company-ntp/recipes/default.rb:
+			-- include_recipe 'ntp"
+You can wrap multiple cookbook recipes together to run in custom recipe
+
+
 
 
