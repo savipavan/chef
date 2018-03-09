@@ -36,3 +36,568 @@ reconfigure chef manage
 Open browser and open IPAddress/login --> proceed --> enter username and password
 
 78-668-3 - Chef-Repo, Setting Up the Work Station, and Bootstrapping A Node
+
+Setting up the Work Station
+---------------------------
+Login to the Chef Console --> Click on Administration --> Click on Organization --> Click on Starter Kit --> Proceed --> 
+
+Start new server and connect the work station --> 
+copy the starter kit -->  into workstation
+scp chef-starter.zip vagrant@192.168.1.16:~/
+
+yum install unzip
+
+unzip chef-starter.zip
+rm -rf chef-starter.zip
+cd chef-repo
+ls -la
+cd .chef
+cat knife.rb
+
+knife ssl fetch
+
+on agent 
+---------
+login ssh
+proviede root permissions to the user account
+usermod -g wheel vagrant
+
+on workstation:
+
+
+Boot strap ( run below command inside chef-repo)
+#knife bootstrap 192.168.61.13 -N centos-node1 --ssh-user root --sudo 
+
+on console: we can see the node
+
+Node Object: The node object is made up of groups of attributes and the node run-lists
+An attribute is a specific piece of data about the node.
+- CPU information
+- IP Address
+- Hostname
+
+Attributes are collected by a tool called ohai, 
+- Chef-client automatically executes ohai and stores the data about a node in an object.
+- This node object information can be used within the recipes named node.
+- This information combined with the nodes run-lists is called the node object
+- The node object is stored in a JSON file on the server.
+
+Working with Ohai and Node Attributes:
+
+#ohai
+#ohai ipaddress
+#ohai hostname
+#ohai | grep ipaddress
+#ohai cpu
+#ohai | grep swap
+#ohai platform
+
+#ohai platform_family
+
+On workstation:
+cd chef-repo
+cd cookbooks
+#create chef recipes
+
+#upload recipe in to server
+knife recipe upload learn.rb
+
+#add recipe in to node runlist
+knife node run_list add <node ip or dns> 'recipe[learn.rb]'
+
+on a client :
+chef-client
+
+693.3 Understanding Search
+--------------------------
+Search : Chef Search allows a search from either knife or within a recipe in order to search any data that is indexed by the Chef Server
+Data is stored within Chef server indexes.
+1. Client
+2. Data bags
+3. Environments
+4. Nodes
+5. Roles
+
+Knife Query Syntax:
+knife search INDEX "key:search_pattern"
+
+Note: If no index is passed, then the default "node" is applied.
+Key is a field name found in the JSON description of an indexable object on the chef server and search_pattern defines what will be searched for.
+
+Index can either be a role, node, client, environment, or data bag.
+The search pattern can include certain regular expressions to form a search query. This is supported in knife as well as when using search within a recipe.
+
+Using Search For Dynamic Orchestration:
+Scenario: Discover all nodes with a role of "web" and add them to a load balancer.
+Web_nodes = search('role', 'role:web')
+Role = The index we are going to search
+Role:web=The key: search_pattern
+
+Search:
+knife search node 'platform_family:rhel'
+knife search node 'recipes:apache\:\:default'
+knife search node 'platform:centos or platform:debian'
+
+Regular Expressions in search:
+
+knife search node 'platform*:ubunut'
+knife search node 'platfor?:centos'
+knife search 'network_interfaces_address:*'
+
+*-Replaces zero or more characters with a wildcard
+?-replaces a single character with a wildcard
+
+Search Flags:
+-i will show the node ID
+-a attribute_name will display the specified attribute from the search query results
+-r will show the run-lists for the query results
+
+knife search '*:*'-r
+Will yield the same result as 
+knife search '*:*' - run_list
+
+knife search:
+-------------
+on workstation:
+knife search 'platform_family:rhel'
+knife search 'recipes:apache'
+knife search 'recipes:apache\:\:websites'
+knife search 'recipes:apache\:\:websites*'
+knife search node 'platfor?:centos'
+knife search node 'platfor?:centos' -a hostname
+knife search "*:*" #search all nodes
+knife search "*" -a ipaddress
+knife search "*:*" -a run_list
+knife search role "role:web" -a run_list
+knife search "*:*" -a recipes
+
+1. Building A quick apache cookbook
+------------------------------------
+on workstation (inside chef-repo)
+chef generate cookbook cookbooks/apache
+cd cookbooks
+cd apache
+ls
+vi metadata.rb
+	maintainer:
+	mainteiner email:
+:wq!
+
+cd recipes
+vi default.rb(contains basic information)
+package 'apache2' do
+	package_name 'httpd'
+	action :install
+end
+
+service 'apache2' do
+	service_name 'httpd'
+	action [:start, :enable]
+end
+
+:wq!
+
+ruby -c default.rb
+foodcritic default.rb
+
+vim websites.rb
+file 'default www' do
+	path 'var/www/html/index.html'
+	content 'Hello World!'
+:wq!
+
+ruby -C websites.rb
+foodcritic websites.rb
+
+cd ..
+cd ..(go cookbooks dir)
+
+foodctitic apache
+
+#on cookbooks directory
+#knife cookbook upload apache
+
+git .
+git commit -am "added basic japache cookbook"
+git push -u origin master
+
+on console:
+we can find out our uploaded apache module
+
+2. Managing Node Run_Lists:
+
+connect to node
+login with root user
+
+on chef-repo dir
+#knife node list
+
+add run list
+#knife node run_list add centos-node1 'recipe[apache]'
+
+#knife node show centos-node1
+
+#knife node show -l centos-node1
+
+run chef-convergence locally on node
+on node1
+--------
+why run mode(noop)
+chef-client --why-run
+systemctl status httpd(for checking)
+
+#run chef-client
+chef-client
+
+verificatiion
+#systemctl status httpd
+
+Default apache page has not changed
+vi default.rb
+
+(modify and add in to the default.rb)
+
+include_recipe 'apache::websites'
+
+:wq!
+
+vi metadata.rb
+(change the version)
+
+#knife cookbook upload apache
+
+run chef-client on node
+#chef-client
+open the server webpage in IE
+
+on workstation:
+vi default.rb
+(remove include_recipe)
+:wq!
+
+adding manually added to the run_list
+
+#knife cookbook upload apache
+
+#knife node show centos-node1
+#knife node run_list add centos-node1 'recipe[apache::websites]'
+
+let apache website recipe to apply before apache default recipe
+#knife node run_list add centos-node1 'recipe[apache::websites]' -b recipe[apache]
+
+remove run_list
+knife node run_list remove centos-node1 'recipe[apache::websites],recipe[apache]'
+
+chef-client
+nothing will updated when we run chef-client
+
+add run_list back to node
+knife node run_list add centos-node1 'recipe[apache],recipe[apache::websites]'
+
+3. Chef-Client configuration:
+-----------------------------
+cd /etc/chef
+vi client.rb
+cd trusted_certs
+
+chef-client 
+
+1. Setting up a new node:
+-------------------------
+provision new node
+
+on workstation:
+
+Boot strap ( run below command inside chef-repo)
+#knife bootstrap 192.168.61.14 -N centos-node2 --ssh-user root --sudo
+
+#knife node show centos-node2
+
+cd cookbooks
+chef generate cookbook postgresql
+cd postgresql/recipes/
+vi default.rb
+
+package 'postgresql-server' do
+	notifies: run, 'execute[postgresql-init]'
+end
+
+execute 'postgresql-init'
+	command 'postgresql-setup initdb'
+	action :nothing
+end
+
+service 'postgresql' do	
+	action [:enable, :start]
+end
+
+foodcritic default.rb
+
+git add .
+git commit -am "added the postgresql cookbook"
+git push origin master
+
+2. Roles:
+A role describes a run_list of recipes that are executed on a node.
+
+How might you specify which recipes are to be run on different sets of nodes, without manually modifying each nodes run_list each time a run_list change is required?
+
+ex: reference role
+------------------
+{
+	"name":"web"
+	"description":"Role for our web server nodes for wordpress application",
+	"json_class":"Chef::Role",
+	"default_attributes":{
+	
+	},
+	"override_attributes":{
+	
+	}
+	"chef_type":"role",
+	"run_list":[
+		"recipe[apache2]"
+		"recipe[apache2::websites]"
+		"role[monitoring]"
+	],
+	"env_run_lists":{
+	}
+}
+
+What about role[monitoring] included in the db, haproxy, and web roles we created?
+
+
+Roles: Database
+----------------
+{
+	"name":"databases"
+	"description":"Database Servers For Our Wordpress Application",
+	"json_class":"Chef::Role",
+	"default_attributes":{
+	
+	},
+	"override_attributes":{
+	
+	}
+	"chef_type":"role",
+	"run_list":[
+		"recipe[postgreSQL]"
+		"recipe[postgreSQL::create_databases]",
+		"role[monitoring]"
+	],
+	"env_run_lists":{
+	}
+}
+
+Roles: HAProxy
+--------------
+{
+	"name":"haproxy"
+	"description":"HAProxy load balancer for webnodes",
+	"json_class":"Chef::Role",
+	"default_attributes":{
+	
+	},
+	"override_attributes":{
+	
+	}
+	"chef_type":"role",
+	"run_list":[
+		"recipe[haproxy]",
+		"role[monitoring]"
+	],
+	"env_run_lists":{
+	}
+}
+
+Role: Monitoring
+----------------
+What about role[monitoring] included in the db, haproxy, and web roles we created?
+{
+	"name":"monitoring"
+	"description":"Recipes that make up the monitoring stack required for all nodes",
+	"json_class":"Chef::Role",
+	"default_attributes":{
+	
+	},
+	"override_attributes":{
+	
+	}
+	"chef_type":"role",
+	"run_list":[
+		"recipe[nagios]",
+		"recipe[collectd]"
+	],
+	"env_run_lists":{
+	}
+}
+
+When you assign a role to a node you do so in its run list.
+$knife node run_list set nodename "role[web]"
+All recipes and roles assigned to the web role run list will be executed on this node.
+
+After making a change to the roles, how can we force the new run list to execute on nodes with a given role assigned to them?
+1. Wait for chef-client on the nodes to execute if chef-client is set to run at intervals.
+2. Execute knife ssh
+
+knife ssh "role:web" "sudo chef-client" -x user -P password
+
+3. Creating Roles:
+------------------
+on GUI:
+remove the 3 recipes we assigned
+
+on workstation:
+
+#which vim
+#which nano
+#export EDITOR=$(which vim)
+ls -al
+# vim .bashrc
+place "export EDITOR=$(which vim)"
+:wq!
+
+cd chef-repo
+
+#knife role create web
+
+"run_list": [
+	"recipe[apache]",
+	"recipe[apache::websites]",
+	"recipe[apache::motd]"
+:wq!
+
+#knife role edit web
+
+#knife node run_list set centos-node2 "role[web]"
+
+#knife role edit web
+update below:
+"run_list": [
+	"recipe[apache]",
+	"recipe[apache::websites]",
+:wq!
+
+#knife node show centos-node2
+
+run chef-client from workstation:
+knife ssh "role:web" "sudo chef-client" -x root -P
+
+upload postgresql cookbook in to server
+#knife cookbook upload postgresql
+
+Create a database role:
+knife role create database
+
+"run_list": [
+	"recipe[postgresql]"
+
+:wq!
+
+#knife node run_list set centos-node1 "role[database]"
+
+cd cookbooks/postgresql/recipes/
+vi default.rb
+
+update
+------
+package 'postgresql-server' do
+	notifies :run, 'execute[postgresql-init];, :immediately
+end
+
+:wq!
+
+upload cookbook to knife server
+#knife cookbook upload postgresql
+
+run chef-client from workstation:
+#knife ssh "role:database" "sudo chef-client" -x root -P
+
+#knife ssh "role:database" "sudo systemctl status postgresql" -x user -P
+
+#knife node show centos-node2
+#knife node show centos-node1
+
+4. Example_Using search in Recipes:
+-----------------------------------
+on workstation:
+
+cd chef-repo
+cd cookbooks/apache/recipes
+vi websites.rb
+
+add below:
+webnodes = search ('node', 'role:web')
+
+webnodes.each do |node|
+	puts node
+end
+
+:wq!
+
+knife cookbook upload apache
+
+on client:
+sudo chef-client
+
+5. Environments:
+----------------
+Implementing Web Node Apache Cookbook Changes:
+-----
+
+Scenario: You've been tasked with making changes to the Apache cookbook from 1.0 to 2.0 versions. These changes need to go through the Testing, Q/A, and staging environments before production. How can we use the same roles for all environments, including production, but limit the cookbook version only to specific environments?
+
+Cookbook Development(Apache 2.0) -> Testing Environment(Apache 2.0) -> Q/A Environment(Apache 2.0) -> Staging Environment(Apache 2.0) -> Production Environment(Apache 1.0)
+
+Environments: Understanding Chef Environments
+
+Every node belongs to the _default environment.
+The _default environment cannot be modified.
+
+Environments allow you to assign roles that contain a specific cookbook version to a group of nodes, while also allowing a certain cookbook version to execute given the environment "configurations".
+
+A more simple way of thinking about it is "generally every environment is associated with one or more cookbooks or cookbook versions"
+
+	name 'Production'
+	description 'Production Environment'
+	cookbook 'apache' '=1.0'
+	
+	name 'staging'
+	description 'Staging Environment Before Production'
+	cookbook 'apache','=2.0'
+
+22.6 Bootstraping The staging node:
+-----------------------------------
+Build new Centos7
+
+on workstation:
+knife bootstrap <IPAddress> -N centos-node3 -x user -sudo
+
+knife node list
+
+knife node run_list centos-node 'role[web]'
+knife role show web
+
+cd cookbooks/apache
+vi metadata.rb
+update version from 1.0 to 2.0
+
+knife cookbook upload apache
+
+vi websites.rb
+add 1.0
+
+knife cookbook upload apache
+
+chanage metadata.rb, websites.rb
+
+knife cookbook upload apache
+
+22.7 Creating and using environments:
+-------------------------------------
+GUI --> Policy --> Environments --> new --> staging 2.0 --> new --> production
+
+Assign the environments to nodes
+
+chef-client on both the servers
+ 
